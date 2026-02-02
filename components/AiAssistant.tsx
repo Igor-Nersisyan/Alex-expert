@@ -11,9 +11,6 @@ interface Message {
   isError?: boolean;
 }
 
-// Инициализация SDK. Ключ берется строго из окружения.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const AiAssistant: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -533,6 +530,20 @@ ${JSON.stringify(PROJECTS.map(p => ({ title: p.title, price: p.price, descriptio
 
   const getChat = () => {
     if (!chatRef.current) {
+      // БЕЗОПАСНОЕ ПОЛУЧЕНИЕ КЛЮЧА
+      let apiKey = '';
+      try {
+        apiKey = process.env.API_KEY || '';
+      } catch (e) {
+        console.error("Failed to access process.env.API_KEY", e);
+      }
+
+      if (!apiKey) {
+        throw new Error("API Key is missing. Please configure process.env.API_KEY.");
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+      
       chatRef.current = ai.chats.create({
         model: 'gemini-2.5-flash',
         config: {
