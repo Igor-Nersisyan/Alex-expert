@@ -1,12 +1,37 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, Sparkles, ChevronDown } from 'lucide-react';
-import { GoogleGenAI, Chat } from "@google/genai";
+import { MessageCircle, X, Send, Bot, Sparkles, ChevronDown, AlertTriangle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { PROJECTS, PROCESS_STEPS, DEVELOPER_INFO } from '../constants';
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { PROJECTS, PROCESS_STEPS, DEVELOPER_INFO, FAQS } from '../constants';
 
-// Системный промпт (используется только при наличии API ключа) **ЗАПРЕЩЕНО ИЗМЕНЯТЬ**
-const SYSTEM_PROMPT = `
-Ты — AI-Business Partner старшего разработчика по имени ${DEVELOPER_INFO.name}.
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  isError?: boolean;
+}
+
+// Инициализация SDK. Ключ берется строго из окружения.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+const AiAssistant: React.FC = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([
+    { 
+      id: 'init', 
+      role: 'assistant', 
+      content: 'Привет! Я цифровой аватар Алекса. Готов ответить на любые вопросы по проектам, стеку или ценам.' 
+    }
+  ]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Ref для хранения сессии чата, чтобы сохранять контекст диалога
+  const chatRef = useRef<any>(null);
+
+  // СТРОГО ЗАДАННЫЙ ПРОМПТ. ИЗМЕНЕНИЯ ЗАПРЕЩЕНЫ.
+  const systemInstruction = `Ты — AI-Business Partner старшего разработчика по имени ${DEVELOPER_INFO.name}.
 Твоя главная цель: ВОВЛЕЧЬ клиента в диалог, выяснить его потребности и только потом предложить решение.
 Твой стиль общения: профессиональный, дружелюбный, лаконичный. Ты эксперт в AI-автоматизации.
 
@@ -506,25 +531,17 @@ Event Wizard AI — это AI Sales Assistant для индустрии корп
 ${JSON.stringify(PROJECTS.map(p => ({ title: p.title, price: p.price, description: p.description, tags: p.tags })))}
 `;
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-const AiAssistant: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    { 
-      id: 'init', 
-      role: 'assistant', 
-      content: 'Привет! Я цифровой аватар Алекса. \n\nРасскажите про вашу задачу: вы хотите автоматизировать текущий бизнес или запустить новый стартап?' 
+  const getChat = () => {
+    if (!chatRef.current) {
+      chatRef.current = ai.chats.create({
+        model: 'gemini-2.5-flash',
+        config: {
+          systemInstruction: systemInstruction,
+        }
+      });
     }
-  ]);
-  const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatSessionRef = useRef<Chat | null>(null);
+    return chatRef.current;
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -533,16 +550,6 @@ const AiAssistant: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isOpen]);
-
-  const handleScrollToContact = () => {
-    const element = document.getElementById('contact');
-    if (element) {
-      const headerOffset = 100;
-      const elementPosition = element.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.scrollY - headerOffset;
-      window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
-    }
-  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -559,210 +566,147 @@ const AiAssistant: React.FC = () => {
     setIsLoading(true);
 
     try {
-      let assistantContent = "";
-      // Безопасное получение ключа. При сборке (Vite/Webpack) process.env.API_KEY заменится на реальный ключ, если он задан.
-      const apiKey = process.env.API_KEY; 
+      const chat = getChat();
       
-      if (apiKey) {
-        // --- РЕЖИМ С НЕЙРОСЕТЬЮ (ЕСЛИ ЕСТЬ КЛЮЧ) ---
-        if (!chatSessionRef.current) {
-           const ai = new GoogleGenAI({ apiKey });
-           chatSessionRef.current = ai.chats.create({
-             model: 'gemini-3-flash-preview',
-             config: { systemInstruction: SYSTEM_PROMPT }
-           });
-        }
-        
-        const response = await chatSessionRef.current.sendMessage({
-           message: userMessage.content
-        });
-        
-        assistantContent = response.text || "Извините, не удалось сгенерировать ответ.";
-
-      } else {
-        // --- ДЕМО РЕЖИМ (ЕСЛИ КЛЮЧА НЕТ) ---
-        // Этот код позволяет сайту отвечать на вопросы о проектах, даже если API ключ не настроен на сервере.
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const lowerInput = userMessage.content.toLowerCase();
-        
-        // 1. Поиск проекта в базе по ключевым словам
-        const foundProject = PROJECTS.find(p => 
-          lowerInput.includes(p.title.toLowerCase()) || 
-          p.tags.some(t => lowerInput.includes(t.toLowerCase())) ||
-          (lowerInput.includes('news') && p.title.includes('News')) ||
-          (lowerInput.includes('crm') && p.title.includes('Rent')) ||
-          (lowerInput.includes('сайт') && p.title.includes('Event'))
-        );
-
-        if (foundProject) {
-           assistantContent = `**${foundProject.title}** — отличный пример. \n\n${foundProject.description}\n\nОриентировочная стоимость: **${foundProject.price}**. Хотите обсудить похожий проект? [DEMO]`;
-        } 
-        // 2. Вопросы про цену
-        else if (lowerInput.includes('цен') || lowerInput.includes('стоит') || lowerInput.includes('бюджет') || lowerInput.includes('сколько')) {
-          assistantContent = "Стоимость разработки варьируется от **150 000 ₽** (простые боты) до **500 000 ₽+** (сложные CRM). \n\nЧтобы назвать точную цифру, мне нужно чуть больше деталей. У вас уже есть ТЗ? [DEMO]";
-        } 
-        // 3. Вопросы про начало работы / нет ТЗ
-        else if (lowerInput.includes('идея') || lowerInput.includes('нет тз') || lowerInput.includes('с чего начать')) {
-          assistantContent = "Отсутствие ТЗ — не проблема. Мы можем начать с **Этапа 01 (Аналитика)**. Я помогу сформулировать требования и составить техническое задание. \n\nРасскажите в двух словах, какую проблему бизнеса нужно решить? [DEMO]";
-        } 
-        // 4. Согласие / Контакты
-        else if (lowerInput.includes('заказ') || lowerInput.includes('связ') || lowerInput.includes('контакт') || lowerInput.includes('да') || lowerInput.includes('хочу')) {
-          assistantContent = "Отлично! Давайте перейдем к конкретике. Оставьте заявку в форме ниже, и Алекс свяжется с вами. [ACTION:SCROLL_TO_CONTACT]";
-        } 
-        // 5. Дефолтный ответ
-        else {
-          assistantContent = "Это интересная задача. Мы специализируемся на AI-автоматизации (LLM, RAG, генерация контента). \n\nМожете уточнить, какой объем данных планируется обрабатывать или сколько пользователей будет в системе? [DEMO]";
-        }
-      }
-
-      // Обработка Action Tag
-      let finalContent = assistantContent;
-      let shouldScroll = false;
-
-      if (assistantContent.includes('[ACTION:SCROLL_TO_CONTACT]')) {
-        finalContent = assistantContent.replace('[ACTION:SCROLL_TO_CONTACT]', '').trim();
-        shouldScroll = true;
-      }
-
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
+      // Создаем сообщение ассистента, которое будет наполняться стримом
+      const assistantMessageId = (Date.now() + 1).toString();
+      setMessages(prev => [...prev, {
+        id: assistantMessageId,
         role: 'assistant',
-        content: finalContent
-      };
+        content: ''
+      }]);
 
-      setMessages(prev => [...prev, aiMessage]);
+      const result = await chat.sendMessageStream({ message: userMessage.content });
       
-      if (shouldScroll) {
-        setTimeout(handleScrollToContact, 1000); 
+      let fullText = '';
+      for await (const chunk of result) {
+        const c = chunk as GenerateContentResponse;
+        const text = c.text;
+        if (text) {
+          fullText += text;
+          setMessages(prev => prev.map(msg => 
+            msg.id === assistantMessageId 
+              ? { ...msg, content: fullText }
+              : msg
+          ));
+        }
       }
 
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      console.error('Gemini API Error:', error);
+      
+      // Выводим точную причину ошибки пользователю
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'assistant',
-        content: "Произошла ошибка. Пожалуйста, попробуйте позже."
+        isError: true,
+        content: `**Ошибка API:** ${errorMessage}`
       }]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Helper to check if the last message is an empty assistant message (waiting for stream)
+  const isWaitingForFirstChunk = isLoading && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && messages[messages.length - 1].content.length === 0;
+
   return (
     <>
       {/* Trigger Button */}
-      <button
+      <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 right-6 z-[60] p-4 rounded-full shadow-[0_0_30px_rgba(99,102,241,0.5)] transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center ${
-          isOpen ? 'bg-slate-800 text-white rotate-90' : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
-        }`}
+        className={`fixed bottom-8 right-8 z-50 p-4 rounded-full shadow-[0_0_20px_rgba(99,102,241,0.5)] transition-all duration-300 hover:scale-110 flex items-center justify-center ${isOpen ? 'bg-slate-800 text-white rotate-90' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}
+        aria-label="Toggle AI Assistant"
       >
         {isOpen ? <X size={28} /> : <MessageCircle size={28} />}
-        
-        {/* Notification Dot if closed */}
-        {!isOpen && (
-           <span className="absolute -top-1 -right-1 flex h-4 w-4">
-             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-             <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
-           </span>
-        )}
       </button>
 
       {/* Chat Window */}
       <div 
-        className={`fixed bottom-24 right-6 w-[90vw] md:w-[400px] h-[500px] max-h-[70vh] bg-slate-900/95 backdrop-blur-xl border border-indigo-500/30 rounded-2xl shadow-2xl flex flex-col z-[60] transition-all duration-300 origin-bottom-right ${
-          isOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-10 pointer-events-none'
-        }`}
+        className={`fixed bottom-24 right-4 md:right-8 w-[90vw] md:w-[400px] h-[600px] max-h-[80vh] bg-slate-900/95 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl flex flex-col z-50 transition-all duration-300 origin-bottom-right ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none translate-y-10'}`}
       >
         {/* Header */}
-        <div className="p-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 to-slate-800 rounded-t-2xl flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-indigo-600/20 border border-indigo-500/50 flex items-center justify-center text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-              <Bot size={24} />
-            </div>
-            <div>
-              <h3 className="font-bold text-white flex items-center gap-2">
-                Alex (AI)
-                <Sparkles size={14} className="text-yellow-400 animate-pulse" />
-              </h3>
-              <p className="text-xs text-green-400 font-medium flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                Online
-              </p>
-            </div>
+        <div className="p-4 border-b border-slate-800 flex items-center gap-3 bg-gradient-to-r from-indigo-900/50 to-slate-900 rounded-t-2xl">
+          <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center shadow-lg relative">
+            <Bot size={24} className="text-white" />
+            <div className="absolute -bottom-1 -right-1 bg-green-500 w-3 h-3 rounded-full border-2 border-slate-900"></div>
           </div>
-          <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white">
+          <div>
+            <h3 className="font-bold text-white flex items-center gap-2">
+              Alex AI
+            </h3>
+            <p className="text-xs text-indigo-300">Онлайн</p>
+          </div>
+          <button onClick={() => setIsOpen(false)} className="ml-auto text-slate-400 hover:text-white">
             <ChevronDown size={20} />
           </button>
         </div>
 
-        {/* Messages Body */}
+        {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-          {messages.map((msg) => (
-            <div 
-              key={msg.id} 
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+          {messages.map((msg) => {
+            // Если сообщение пустое (мы ждем поток), не рендерим пузырь сообщения вообще,
+            // вместо него будет индикатор загрузки снизу
+            if (msg.role === 'assistant' && msg.content === '' && !msg.isError) return null;
+
+            return (
               <div 
-                className={`max-w-[85%] p-3.5 rounded-2xl text-sm leading-relaxed ${
-                  msg.role === 'user' 
-                    ? 'bg-indigo-600 text-white rounded-tr-none shadow-lg' 
-                    : 'bg-slate-800 border border-slate-700 text-slate-200 rounded-tl-none shadow-md'
-                }`}
+                key={msg.id} 
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <ReactMarkdown
-                  components={{
-                    ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
-                    ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
-                    li: ({node, ...props}) => <li className="" {...props} />,
-                    p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
-                    strong: ({node, ...props}) => <span className="font-bold text-white" {...props} />,
-                    a: ({node, ...props}) => <a className="text-indigo-300 underline hover:text-white" target="_blank" rel="noopener noreferrer" {...props} />,
-                    h1: ({node, ...props}) => <h3 className="font-bold text-white text-base mb-2" {...props} />,
-                    h2: ({node, ...props}) => <h4 className="font-bold text-white text-sm mb-2" {...props} />,
-                    h3: ({node, ...props}) => <strong className="font-bold text-white block mb-1" {...props} />,
-                  }}
+                <div 
+                  className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
+                    msg.role === 'user' 
+                      ? 'bg-indigo-600 text-white rounded-br-none shadow-lg' 
+                      : msg.isError 
+                        ? 'bg-red-900/50 border border-red-500/50 text-red-200 rounded-bl-none'
+                        : 'bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-none shadow-md'
+                  }`}
                 >
-                  {msg.content}
-                </ReactMarkdown>
+                  {msg.isError && <AlertTriangle size={16} className="inline-block mr-2 mb-1" />}
+                  {msg.role === 'assistant' ? (
+                    <div className="prose prose-invert prose-sm max-w-none break-words">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    msg.content
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           
-          {isLoading && (
+          {/* Only show thinking indicator if we are loading AND the last assistant message is still empty */}
+          {isWaitingForFirstChunk && (
             <div className="flex justify-start">
-              <div className="bg-slate-800 border border-slate-700 p-3 rounded-2xl rounded-tl-none flex gap-1.5 items-center">
-                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce"></div>
+              <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl rounded-bl-none flex items-center gap-2">
+                <Sparkles size={16} className="text-indigo-400 animate-pulse" />
+                <span className="text-slate-400 text-xs animate-pulse">Думаю...</span>
               </div>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Footer Input */}
+        {/* Input Area */}
         <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-800 bg-slate-900/50 rounded-b-2xl">
-          <div className="relative flex items-center">
+          <div className="relative">
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Спросите про цены или проекты..."
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-4 pr-12 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-600"
+              placeholder="Введите сообщение..."
+              className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-4 pr-12 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
             />
             <button 
-              type="submit" 
-              disabled={isLoading || !inputValue.trim()}
-              className="absolute right-2 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors"
+              type="submit"
+              disabled={!inputValue.trim() || isLoading}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors"
             >
               <Send size={16} />
             </button>
-          </div>
-          <div className="text-center mt-2">
-            <p className="text-[10px] text-slate-600">
-              AI может ошибаться. Проверяйте информацию.
-            </p>
           </div>
         </form>
       </div>
