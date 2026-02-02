@@ -4,7 +4,7 @@ import { GoogleGenAI, Chat } from "@google/genai";
 import ReactMarkdown from 'react-markdown';
 import { PROJECTS, PROCESS_STEPS, DEVELOPER_INFO } from '../constants';
 
-// Системный промпт с "RAG" на клиенте (Context Injection)
+// Системный промпт (используется только при наличии API ключа) **ЗАПРЕЩЕНО ИЗМЕНЯТЬ**
 const SYSTEM_PROMPT = `
 Ты — AI-Business Partner старшего разработчика по имени ${DEVELOPER_INFO.name}.
 Твоя главная цель: ВОВЛЕЧЬ клиента в диалог, выяснить его потребности и только потом предложить решение.
@@ -502,8 +502,8 @@ Event Wizard AI — это AI Sales Assistant для индустрии корп
 
 **Суть проекта:** превращение хаотичного общения с клиентом в структурированную сделку с помощью AI.
 
-СПРАВОЧНИК ЦЕН (ОТПРАВНАЯ ТОЧКА):
-${JSON.stringify(PROJECTS.map(p => ({ title: p.title, price: p.price })))}
+СПРАВОЧНИК ЦЕН И ПРОЕКТОВ (ДЛЯ КОНТЕКСТА):
+${JSON.stringify(PROJECTS.map(p => ({ title: p.title, price: p.price, description: p.description, tags: p.tags })))}
 `;
 
 interface Message {
@@ -534,11 +534,9 @@ const AiAssistant: React.FC = () => {
     scrollToBottom();
   }, [messages, isOpen]);
 
-  // Функция скролла к контактам
   const handleScrollToContact = () => {
     const element = document.getElementById('contact');
     if (element) {
-      // Не закрываем чат, чтобы пользователь мог дочитать сообщение
       const headerOffset = 100;
       const elementPosition = element.getBoundingClientRect().top;
       const offsetPosition = elementPosition + window.scrollY - headerOffset;
@@ -562,16 +560,16 @@ const AiAssistant: React.FC = () => {
 
     try {
       let assistantContent = "";
+      // Безопасное получение ключа. При сборке (Vite/Webpack) process.env.API_KEY заменится на реальный ключ, если он задан.
       const apiKey = process.env.API_KEY; 
       
       if (apiKey) {
+        // --- РЕЖИМ С НЕЙРОСЕТЬЮ (ЕСЛИ ЕСТЬ КЛЮЧ) ---
         if (!chatSessionRef.current) {
            const ai = new GoogleGenAI({ apiKey });
            chatSessionRef.current = ai.chats.create({
              model: 'gemini-3-flash-preview',
-             config: {
-               systemInstruction: SYSTEM_PROMPT,
-             }
+             config: { systemInstruction: SYSTEM_PROMPT }
            });
         }
         
@@ -582,18 +580,38 @@ const AiAssistant: React.FC = () => {
         assistantContent = response.text || "Извините, не удалось сгенерировать ответ.";
 
       } else {
-        // --- ДЕМО РЕЖИМ ---
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // --- ДЕМО РЕЖИМ (ЕСЛИ КЛЮЧА НЕТ) ---
+        // Этот код позволяет сайту отвечать на вопросы о проектах, даже если API ключ не настроен на сервере.
+        await new Promise(resolve => setTimeout(resolve, 1000));
         const lowerInput = userMessage.content.toLowerCase();
         
-        if (lowerInput.includes('цен') || lowerInput.includes('стоит') || lowerInput.includes('бюджет')) {
-          assistantContent = "Разработка стоит от **150 000 ₽** до **500 000 ₽+**. \n\nНапример, внедрение **Rent Pilot AI** (CRM с голосовым вводом) стоило ~300к. \n\nУ вас уже есть ТЗ, чтобы я мог дать точную оценку? [DEMO]";
-        } else if (lowerInput.includes('идея') || lowerInput.includes('нет тз')) {
-          assistantContent = "Без проблем. Мы можем начать с **Этапа 01 (Обсуждение)**. Я помогу структурировать идею. \n\nОпишите своими словами, какую проблему должен решать продукт? [DEMO]";
-        } else if (lowerInput.includes('заказ') || lowerInput.includes('связ') || lowerInput.includes('контакт') || lowerInput.includes('да')) {
-          assistantContent = "Отлично. Я прокручу страницу к форме контактов — оставьте там свой номер или Telegram. [ACTION:SCROLL_TO_CONTACT]";
-        } else {
-          assistantContent = "Звучит как задача для AI. Мы делали похожее в проекте **IT Sales AI** (там есть анализ звонков и симуляция диалогов). \n\nСкажите, какой объем данных планируется обрабатывать? [DEMO]";
+        // 1. Поиск проекта в базе по ключевым словам
+        const foundProject = PROJECTS.find(p => 
+          lowerInput.includes(p.title.toLowerCase()) || 
+          p.tags.some(t => lowerInput.includes(t.toLowerCase())) ||
+          (lowerInput.includes('news') && p.title.includes('News')) ||
+          (lowerInput.includes('crm') && p.title.includes('Rent')) ||
+          (lowerInput.includes('сайт') && p.title.includes('Event'))
+        );
+
+        if (foundProject) {
+           assistantContent = `**${foundProject.title}** — отличный пример. \n\n${foundProject.description}\n\nОриентировочная стоимость: **${foundProject.price}**. Хотите обсудить похожий проект? [DEMO]`;
+        } 
+        // 2. Вопросы про цену
+        else if (lowerInput.includes('цен') || lowerInput.includes('стоит') || lowerInput.includes('бюджет') || lowerInput.includes('сколько')) {
+          assistantContent = "Стоимость разработки варьируется от **150 000 ₽** (простые боты) до **500 000 ₽+** (сложные CRM). \n\nЧтобы назвать точную цифру, мне нужно чуть больше деталей. У вас уже есть ТЗ? [DEMO]";
+        } 
+        // 3. Вопросы про начало работы / нет ТЗ
+        else if (lowerInput.includes('идея') || lowerInput.includes('нет тз') || lowerInput.includes('с чего начать')) {
+          assistantContent = "Отсутствие ТЗ — не проблема. Мы можем начать с **Этапа 01 (Аналитика)**. Я помогу сформулировать требования и составить техническое задание. \n\nРасскажите в двух словах, какую проблему бизнеса нужно решить? [DEMO]";
+        } 
+        // 4. Согласие / Контакты
+        else if (lowerInput.includes('заказ') || lowerInput.includes('связ') || lowerInput.includes('контакт') || lowerInput.includes('да') || lowerInput.includes('хочу')) {
+          assistantContent = "Отлично! Давайте перейдем к конкретике. Оставьте заявку в форме ниже, и Алекс свяжется с вами. [ACTION:SCROLL_TO_CONTACT]";
+        } 
+        // 5. Дефолтный ответ
+        else {
+          assistantContent = "Это интересная задача. Мы специализируемся на AI-автоматизации (LLM, RAG, генерация контента). \n\nМожете уточнить, какой объем данных планируется обрабатывать или сколько пользователей будет в системе? [DEMO]";
         }
       }
 
@@ -623,7 +641,7 @@ const AiAssistant: React.FC = () => {
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'assistant',
-        content: "Произошла ошибка соединения с Gemini API. Попробуйте позже."
+        content: "Произошла ошибка. Пожалуйста, попробуйте позже."
       }]);
     } finally {
       setIsLoading(false);
