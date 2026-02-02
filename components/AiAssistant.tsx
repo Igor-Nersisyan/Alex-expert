@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, Sparkles, ChevronDown } from 'lucide-react';
 import { GoogleGenAI, Chat } from "@google/genai";
 import ReactMarkdown from 'react-markdown';
-import { PROJECTS, PROCESS_STEPS, DEVELOPER_INFO } from '../constants';
+import { PROJECTS, DEVELOPER_INFO } from '../constants';
 
 // Системный промпт (используется только при наличии API ключа) **ЗАПРЕЩЕНО ИЗМЕНЯТЬ**
 const SYSTEM_PROMPT = `
@@ -21,12 +21,6 @@ const SYSTEM_PROMPT = `
 1.  Ответы емкие, но информативные. Если спрашивают детали реализации — отвечай подробно, используя базу знаний.
 2.  Всегда заканчивай вопросом.
 3.  Если пришло время называть цену, называй вилкой "от X до Y" (бери из справочника).
-
-
-
-
-
-
 
 # БАЗА ЗНАНИЙ (Context Injection):
 
@@ -559,63 +553,30 @@ const AiAssistant: React.FC = () => {
     setIsLoading(true);
 
     try {
-      let assistantContent = "";
-      // Безопасное получение ключа. При сборке (Vite/Webpack) process.env.API_KEY заменится на реальный ключ, если он задан.
+      // 1. Check API Key
       const apiKey = process.env.API_KEY; 
       
-      if (apiKey) {
-        // --- РЕЖИМ С НЕЙРОСЕТЬЮ (ЕСЛИ ЕСТЬ КЛЮЧ) ---
-        if (!chatSessionRef.current) {
-           const ai = new GoogleGenAI({ apiKey });
-           chatSessionRef.current = ai.chats.create({
-             model: 'gemini-2.5-flash',
-             config: { systemInstruction: SYSTEM_PROMPT }
-           });
-        }
-        
-        const response = await chatSessionRef.current.sendMessage({
-           message: userMessage.content
-        });
-        
-        assistantContent = response.text || "Извините, не удалось сгенерировать ответ.";
-
-      } else {
-        // --- ДЕМО РЕЖИМ (ЕСЛИ КЛЮЧА НЕТ) ---
-        // Этот код позволяет сайту отвечать на вопросы о проектах, даже если API ключ не настроен на сервере.
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const lowerInput = userMessage.content.toLowerCase();
-        
-        // 1. Поиск проекта в базе по ключевым словам
-        const foundProject = PROJECTS.find(p => 
-          lowerInput.includes(p.title.toLowerCase()) || 
-          p.tags.some(t => lowerInput.includes(t.toLowerCase())) ||
-          (lowerInput.includes('news') && p.title.includes('News')) ||
-          (lowerInput.includes('crm') && p.title.includes('Rent')) ||
-          (lowerInput.includes('сайт') && p.title.includes('Event'))
-        );
-
-        if (foundProject) {
-           assistantContent = `**${foundProject.title}** — отличный пример. \n\n${foundProject.description}\n\nОриентировочная стоимость: **${foundProject.price}**. Хотите обсудить похожий проект? [DEMO]`;
-        } 
-        // 2. Вопросы про цену
-        else if (lowerInput.includes('цен') || lowerInput.includes('стоит') || lowerInput.includes('бюджет') || lowerInput.includes('сколько')) {
-          assistantContent = "Стоимость разработки варьируется от **150 000 ₽** (простые боты) до **500 000 ₽+** (сложные CRM). \n\nЧтобы назвать точную цифру, мне нужно чуть больше деталей. У вас уже есть ТЗ? [DEMO]";
-        } 
-        // 3. Вопросы про начало работы / нет ТЗ
-        else if (lowerInput.includes('идея') || lowerInput.includes('нет тз') || lowerInput.includes('с чего начать')) {
-          assistantContent = "Отсутствие ТЗ — не проблема. Мы можем начать с **Этапа 01 (Аналитика)**. Я помогу сформулировать требования и составить техническое задание. \n\nРасскажите в двух словах, какую проблему бизнеса нужно решить? [DEMO]";
-        } 
-        // 4. Согласие / Контакты
-        else if (lowerInput.includes('заказ') || lowerInput.includes('связ') || lowerInput.includes('контакт') || lowerInput.includes('да') || lowerInput.includes('хочу')) {
-          assistantContent = "Отлично! Давайте перейдем к конкретике. Оставьте заявку в форме ниже, и Алекс свяжется с вами. [ACTION:SCROLL_TO_CONTACT]";
-        } 
-        // 5. Дефолтный ответ
-        else {
-          assistantContent = "Это интересная задача. Мы специализируемся на AI-автоматизации (LLM, RAG, генерация контента). \n\nМожете уточнить, какой объем данных планируется обрабатывать или сколько пользователей будет в системе? [DEMO]";
-        }
+      if (!apiKey) {
+        throw new Error('API Key не найден. Пожалуйста, настройте process.env.API_KEY.');
       }
 
-      // Обработка Action Tag
+      // 2. Init Chat if needed
+      if (!chatSessionRef.current) {
+         const ai = new GoogleGenAI({ apiKey });
+         chatSessionRef.current = ai.chats.create({
+           model: 'gemini-2.5-flash',
+           config: { systemInstruction: SYSTEM_PROMPT }
+         });
+      }
+      
+      // 3. Send Message
+      const response = await chatSessionRef.current.sendMessage({
+         message: userMessage.content
+      });
+      
+      const assistantContent = response.text || "Извините, получен пустой ответ от модели.";
+
+      // 4. Handle Actions
       let finalContent = assistantContent;
       let shouldScroll = false;
 
@@ -636,12 +597,14 @@ const AiAssistant: React.FC = () => {
         setTimeout(handleScrollToContact, 1000); 
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      const errorMessage = error instanceof Error ? error.message : "Неизвестная ошибка";
+      
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'assistant',
-        content: "Произошла ошибка. Пожалуйста, попробуйте позже."
+        content: `**Ошибка:** ${errorMessage}\n\nЧат работает только с корректным API Key.`
       }]);
     } finally {
       setIsLoading(false);
@@ -748,7 +711,7 @@ const AiAssistant: React.FC = () => {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Спросите про цены или проекты..."
+              placeholder="Задайте вопрос AI-ассистенту..."
               className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-4 pr-12 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-600"
             />
             <button 
@@ -761,7 +724,7 @@ const AiAssistant: React.FC = () => {
           </div>
           <div className="text-center mt-2">
             <p className="text-[10px] text-slate-600">
-              AI может ошибаться. Проверяйте информацию.
+              Powered by Google Gemini 2.5 Flash
             </p>
           </div>
         </form>
