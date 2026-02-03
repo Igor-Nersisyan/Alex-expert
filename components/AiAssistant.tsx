@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, Sparkles, ChevronDown, AlertTriangle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { PROJECTS, PROCESS_STEPS, DEVELOPER_INFO, FAQS } from '../constants';
 
 interface Message {
@@ -23,9 +22,6 @@ const AiAssistant: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  // Ref для хранения сессии чата, чтобы сохранять контекст диалога
-  const chatRef = useRef<any>(null);
 
   // СТРОГО ЗАДАННЫЙ ПРОМПТ. ИЗМЕНЕНИЯ ЗАПРЕЩЕНЫ.
   const systemInstruction = `Ты — AI-Business Partner старшего разработчика по имени ${DEVELOPER_INFO.name}.
@@ -528,32 +524,6 @@ Event Wizard AI — это AI Sales Assistant для индустрии корп
 ${JSON.stringify(PROJECTS.map(p => ({ title: p.title, price: p.price, description: p.description, tags: p.tags })))}
 `;
 
-  const getChat = () => {
-    if (!chatRef.current) {
-      // БЕЗОПАСНОЕ ПОЛУЧЕНИЕ КЛЮЧА
-      let apiKey = '';
-      try {
-        apiKey = process.env.API_KEY || '';
-      } catch (e) {
-        console.error("Failed to access process.env.API_KEY", e);
-      }
-
-      if (!apiKey) {
-        throw new Error("API Key is missing. Please configure process.env.API_KEY.");
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
-      
-      chatRef.current = ai.chats.create({
-        model: 'gemini-2.5-flash',
-        config: {
-          systemInstruction: systemInstruction,
-        }
-      });
-    }
-    return chatRef.current;
-  };
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -566,6 +536,7 @@ ${JSON.stringify(PROJECTS.map(p => ({ title: p.title, price: p.price, descriptio
     e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
 
+    // 1. Prepare User Message
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -576,45 +547,110 @@ ${JSON.stringify(PROJECTS.map(p => ({ title: p.title, price: p.price, descriptio
     setInputValue('');
     setIsLoading(true);
 
-    try {
-      const chat = getChat();
-      
-      // Создаем сообщение ассистента, которое будет наполняться стримом
-      const assistantMessageId = (Date.now() + 1).toString();
-      setMessages(prev => [...prev, {
-        id: assistantMessageId,
-        role: 'assistant',
-        content: ''
-      }]);
+    // 2. Prepare Assistant Message Placeholder
+    const assistantMessageId = (Date.now() + 1).toString();
+    setMessages(prev => [...prev, {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: ''
+    }]);
 
-      const result = await chat.sendMessageStream({ message: userMessage.content });
-      
+    try {
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) {
+        throw new Error("API Key is missing. Please configure process.env.API_KEY.");
+      }
+
+      // 3. Construct API Request Payload for OpenRouter
+      const payload = {
+        model: "google/gemini-2.0-flash-001", // OpenRouter ID for Gemini 2.0 Flash (latest fast model)
+        messages: [
+          { role: "system", content: systemInstruction },
+          // Include chat history (excluding the first welcome msg and the new user message which we add manually)
+          ...messages
+            .filter(m => m.id !== 'init' && !m.isError)
+            .map(m => ({
+              role: m.role,
+              content: m.content
+            })),
+          { role: "user", content: userMessage.content }
+        ],
+        stream: true
+      };
+
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": window.location.origin, // OpenRouter requirement
+          "X-Title": "Alex Portfolio"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `API Error: ${response.statusText}`);
+      }
+
+      if (!response.body) throw new Error("No response body");
+
+      // 4. Stream Handling
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
       let fullText = '';
-      for await (const chunk of result) {
-        const c = chunk as GenerateContentResponse;
-        const text = c.text;
-        if (text) {
-          fullText += text;
-          setMessages(prev => prev.map(msg => 
-            msg.id === assistantMessageId 
-              ? { ...msg, content: fullText }
-              : msg
-          ));
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+        
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep the last partial line in buffer
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine.startsWith('data: ')) continue;
+          
+          const dataStr = trimmedLine.replace('data: ', '');
+          if (dataStr === '[DONE]') continue;
+
+          try {
+            const data = JSON.parse(dataStr);
+            const delta = data.choices?.[0]?.delta?.content || '';
+            if (delta) {
+              fullText += delta;
+              setMessages(prev => prev.map(msg => 
+                msg.id === assistantMessageId 
+                  ? { ...msg, content: fullText }
+                  : msg
+              ));
+            }
+          } catch (e) {
+            console.warn("Error parsing chunk", e);
+          }
         }
       }
 
     } catch (error: any) {
-      console.error('Gemini API Error:', error);
+      console.error('OpenRouter/Gemini API Error:', error);
       
-      // Выводим точную причину ошибки пользователю
-      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
-        role: 'assistant',
-        isError: true,
-        content: `**Ошибка API:** ${errorMessage}`
-      }]);
+      // Remove the empty loading message and add error message
+      setMessages(prev => {
+        const withoutLoading = prev.filter(msg => msg.id !== assistantMessageId);
+        return [...withoutLoading, {
+          id: Date.now().toString(),
+          role: 'assistant',
+          isError: true,
+          content: `**Ошибка API:** ${errorMessage}`
+        }];
+      });
     } finally {
       setIsLoading(false);
     }
