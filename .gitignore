@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Production / Build
+dist/
+dist-ssr/
+build/
+
+# Misc
+.DS_Store
+*.pem
+
+# Local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vericel / Netlify
+.vercel
+.netlify
+
+# TypeScript / Vite
+*.tsbuildinfo
+vite.config.js.timestamp-*
+
+# IDE / Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# AI Studio utility files & scripts used for this push
+check-git.ts
+check-files.ts
+git-push-script.ts
