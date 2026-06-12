@@ -4,7 +4,7 @@ export const DEVELOPER_INFO = {
   name: "Алекс",
   title: "Разработчик нового поколения | AI-Automation Expert",
   description: "Превращаю ваши идеи в работающие приложения за дни, а не месяцы. Использую возможности современного AI (LLM, нейросети, low-code), чтобы создавать мощные инструменты для бизнеса: от CRM-систем до голосовых ассистентов. Мой подход: минимум бюрократии, максимум функционала. Вы получаете готовый продукт, пока конкуренты только пишут ТЗ.",
-  avatarUrl: "https://i.postimg.cc/qMTFCsYR/image.png" 
+  avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&h=400&q=80" 
 };
 
 export const PROJECTS: Project[] = [
@@ -12,7 +12,7 @@ export const PROJECTS: Project[] = [
     id: '10',
     title: 'AI News Nexus - Техно-новости',
     description: 'Новостной агрегатор в сфере искусственного интеллекта. Уникальная особенность — возможность обсудить любую новость с нейросетью прямо в интерфейсе: получить краткую выжимку, анализ трендов или ответы на вопросы по статье.',
-    imageUrl: 'https://i.postimg.cc/gkHTywFz/Screenshot-6.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&h=600&q=80',
     link: 'https://ai-news-nexus-298924443818.us-west1.run.app/',
     tags: ['News Tech', 'AI Chat', 'React', 'Trends'],
     price: '200 000 ₽'
@@ -21,7 +21,7 @@ export const PROJECTS: Project[] = [
     id: '2',
     title: 'Replit Designer - AI Интерьеры',
     description: 'Веб-сервис для трансформации помещений с помощью нейросетей. Загрузка исходного фото, генерация вариантов дизайна по текстовому промпту и возможность редактирования деталей на естественном языке.',
-    imageUrl: 'https://i.postimg.cc/ncJWQ45x/image-(1).jpg', 
+    imageUrl: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=800&h=600&q=80', 
     link: 'https://agentic-framework-rimilik134.replit.app/',
     tags: ['Generative AI', 'Image Processing', 'Interior Design'],
     price: '250 000 ₽'
@@ -30,7 +30,7 @@ export const PROJECTS: Project[] = [
     id: '7',
     title: 'Russian Cities AI - Умный Гид',
     description: 'Интерактивный AI-консультант по городам России. Помогает строить туристические маршруты, рассказывает исторические факты и дает рекомендации по достопримечательностям в формате живого диалога.',
-    imageUrl: 'https://i.postimg.cc/dtYfT2Xh/Screenshot-2.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1513326738677-b964603b136d?auto=format&fit=crop&w=800&h=600&q=80',
     link: 'https://russian-cities.replit.app/',
     tags: ['Travel Tech', 'AI Guide', 'React', 'RAG'],
     price: '150 000 ₽'
@@ -39,7 +39,7 @@ export const PROJECTS: Project[] = [
     id: '8',
     title: 'Bank Onboarding - Адаптация персонала',
     description: 'Веб-платформа для адаптации банковских сотрудников. Включает интерактивные обучающие модули, систему тестирования и AI-ассистента, который 24/7 отвечает на вопросы по регламентам и продуктам банка.',
-    imageUrl: 'https://i.postimg.cc/L63bkqK4/Screenshot-3.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=800&h=600&q=80',
     link: 'https://bank-employee-onboarding.replit.app/',
     tags: ['FinTech', 'HR Tech', 'Onboarding', 'AI Assistant'],
     price: '450 000 ₽'
@@ -47,8 +47,8 @@ export const PROJECTS: Project[] = [
   {
     id: '1',
     title: 'Rent Pilot AI - CRM для недвижимости',
-    description: 'CRM-система для автоматизации управления арендой. Включает дашборд с финансовой аналитикой, контроль задолженностей и функцию голосового ввода данных для быстрого заполнения карточек объектов.',
-    imageUrl: 'https://i.postimg.cc/65XPGrSB/image.jpg', 
+    description: 'CRM-система для автоматизации управления арендой. Включает дашборд с financial аналитикой, контроль задолженностей и функцию голосового ввода данных для быстрого заполнения карточек объектов.',
+    imageUrl: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&h=600&q=80', 
     link: 'https://rent-pilot-ai-rimilik134.replit.app',
     tags: ['React', 'AI Voice', 'Analytics', 'Dashboard'],
     price: '300 000 ₽'
@@ -57,7 +57,7 @@ export const PROJECTS: Project[] = [
     id: '5',
     title: 'IT Sales AI - Экосистема продаж',
     description: 'Веб-приложение для отделов продаж: Нейро-КК, генератор коммерческих предложений, скрипты и AI-тренажер для менеджеров (голосовые звонки с ИИ) для отработки возражений. Дашборд для отслеживания успехов команды.',
-    imageUrl: 'https://i.postimg.cc/kXmHtQZG/IT-sales.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&h=600&q=80',
     link: 'https://hello-who-are-you--rimilik134.replit.app',
     tags: ['AI Trainer', 'Sales Tech', 'Analytics', 'QC Automation'],
     price: '500 000 ₽'
@@ -66,7 +66,7 @@ export const PROJECTS: Project[] = [
     id: '6',
     title: 'Mira AI - HR Агент',
     description: 'Интеллектуальный AI-рекрутер для подбора персонала. Уникальный веб-интерфейс с Generative UI: контент и структура сайта перестраиваются в реальном времени под запросы пользователя (AI пишет код на лету).',
-    imageUrl: 'https://i.postimg.cc/Prj78WcN/Mira-AI.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=800&h=600&q=80',
     link: 'https://mira-ai-templates.replit.app',
     tags: ['HR Tech', 'Generative UI', 'AI Agent', 'Real-time Coding'],
     price: '400 000 ₽'
@@ -75,7 +75,7 @@ export const PROJECTS: Project[] = [
     id: '9',
     title: 'Content AI - Генератор контента',
     description: 'Универсальная платформа для автоматизации маркетинга. Генерирует контент-планы, email-рассылки, сценарии подкастов, видео-аватары, лонгриды, SEO-статьи и лид-магниты. Полный цикл производства контента в одном окне.',
-    imageUrl: 'https://i.postimg.cc/65fmV7J5/Screenshot-4.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=800&h=600&q=80',
     link: 'https://content-ai.replit.app/',
     tags: ['Content Gen', 'AI Marketing', 'Video AI', 'SEO'],
     price: '350 000 ₽'
@@ -84,7 +84,7 @@ export const PROJECTS: Project[] = [
     id: '3',
     title: 'Aura Estate - Архитектурный AI',
     description: 'Интеллектуальная платформа для проектирования частных домов. Генерирует планировочные решения, создает 3D-визуализации фасадов и автоматически рассчитывает предварительную смету материалов на основе предпочтений заказчика.',
-    imageUrl: 'https://i.postimg.cc/4Ng0h6MT/Aura-Estate.png', 
+    imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&h=600&q=80', 
     link: 'https://aura-estate-ai-665142568070.us-west1.run.app/',
     tags: ['Architecture', '3D Visualization', 'Cost Estimation'],
     price: '550 000 ₽'
@@ -93,7 +93,7 @@ export const PROJECTS: Project[] = [
     id: '4',
     title: 'Event Wizard - Генератор событий',
     description: 'Умный помощник для event-агентств. Создает креативные концепции мероприятий, формирует тайминг, подбирает референсы декора и помогает в логистике. Полный цикл планирования от идеи до чек-листа.',
-    imageUrl: 'https://i.postimg.cc/02s4JY3k/Event-wizard.png', 
+    imageUrl: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=800&h=600&q=80', 
     link: 'https://event-wizard-ai-982821910152.us-west1.run.app',
     tags: ['Event Tech', 'Planning', 'Creative AI'],
     price: '350 000 ₽'
